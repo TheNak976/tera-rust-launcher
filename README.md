@@ -1,7 +1,7 @@
-# Tera Launcher
+# Tera Rust Launcher
 
 ## Description
-Tera Launcher is a custom game launcher designed for Tera Online. It provides features such as automatic updates, game file verification, and multi-language support.
+Tera Rust Launcher is a custom game launcher designed for Tera Online. It provides features such as automatic updates, game file verification, and multi-language support.
 
 ## Key Features
 - User authentication
@@ -27,7 +27,7 @@ This launcher is a custom solution and not officially associated with Tera Onlin
 ## Full Tutorial
 For a comprehensive guide on how to set up and use this launcher, please refer to the full tutorial available at:
 
-[Tera Launcher Tutorial on Ragezone](https://forum.ragezone.com/threads/teralauncher-100-02-advanced-game-launcher-with-tauri-js.1231496/)
+[Tera Rust Launcher Tutorial on Ragezone](https://forum.ragezone.com/threads/teralauncher-100-02-advanced-game-launcher-with-tauri-js.1231496/)
 
 ## Disclaimer
 This project is for educational purposes only. Always respect the terms of service of the game and its publishers.
