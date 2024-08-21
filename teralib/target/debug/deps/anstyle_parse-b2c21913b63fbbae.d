@@ -1,9 +1,0 @@
-c:\Users\Shadow\Documents\GitHub\GoProject\terarustlib\teralib\target\debug\deps\libanstyle_parse-b2c21913b63fbbae.rmeta: C:\Users\Shadow\.cargo\registry\src\index.crates.io-6f17d22bba15001f\anstyle-parse-0.2.4\src\lib.rs C:\Users\Shadow\.cargo\registry\src\index.crates.io-6f17d22bba15001f\anstyle-parse-0.2.4\src\params.rs C:\Users\Shadow\.cargo\registry\src\index.crates.io-6f17d22bba15001f\anstyle-parse-0.2.4\src\state\mod.rs C:\Users\Shadow\.cargo\registry\src\index.crates.io-6f17d22bba15001f\anstyle-parse-0.2.4\src\state\definitions.rs C:\Users\Shadow\.cargo\registry\src\index.crates.io-6f17d22bba15001f\anstyle-parse-0.2.4\src\state\table.rs
-
-c:\Users\Shadow\Documents\GitHub\GoProject\terarustlib\teralib\target\debug\deps\anstyle_parse-b2c21913b63fbbae.d: C:\Users\Shadow\.cargo\registry\src\index.crates.io-6f17d22bba15001f\anstyle-parse-0.2.4\src\lib.rs C:\Users\Shadow\.cargo\registry\src\index.crates.io-6f17d22bba15001f\anstyle-parse-0.2.4\src\params.rs C:\Users\Shadow\.cargo\registry\src\index.crates.io-6f17d22bba15001f\anstyle-parse-0.2.4\src\state\mod.rs C:\Users\Shadow\.cargo\registry\src\index.crates.io-6f17d22bba15001f\anstyle-parse-0.2.4\src\state\definitions.rs C:\Users\Shadow\.cargo\registry\src\index.crates.io-6f17d22bba15001f\anstyle-parse-0.2.4\src\state\table.rs
-
-C:\Users\Shadow\.cargo\registry\src\index.crates.io-6f17d22bba15001f\anstyle-parse-0.2.4\src\lib.rs:
-C:\Users\Shadow\.cargo\registry\src\index.crates.io-6f17d22bba15001f\anstyle-parse-0.2.4\src\params.rs:
-C:\Users\Shadow\.cargo\registry\src\index.crates.io-6f17d22bba15001f\anstyle-parse-0.2.4\src\state\mod.rs:
-C:\Users\Shadow\.cargo\registry\src\index.crates.io-6f17d22bba15001f\anstyle-parse-0.2.4\src\state\definitions.rs:
-C:\Users\Shadow\.cargo\registry\src\index.crates.io-6f17d22bba15001f\anstyle-parse-0.2.4\src\state\table.rs:
