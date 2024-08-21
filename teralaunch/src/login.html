@@ -1,0 +1,41 @@
+<section class="login-form-container-wrapper">
+    <div class="login-form-container">
+      <div class="tera-logo-1-wrapper">
+        <img
+          class="tera-logo-1-icon"
+          loading="lazy"
+          alt=""
+          src="./assets/tera-logo@2x.png"
+        />
+      </div>
+      <form class="login-form">
+        <div class="login-wrapper">
+          <span class="login1" data-translate="LOGIN_TITLE">Login</span>
+        </div>
+        <div class="input-fields-wrapper">
+          <div class="input-fields">
+            <input class="input-text" id="username" name="username" data-translate-placeholder="USERNAME_PLACEHOLDER" placeholder="Username" type="text" />
+
+            <input class="input-text1" id="password" name="password" data-translate-placeholder="PASSWORD_PLACEHOLDER" placeholder="Password" type="text" />
+          </div>
+        </div>
+        <div class="login-error-msg" id="login-error-msg" data-translate="SERVER_CONNECTION_ERROR" style="display: none; opacity: 0; transform: translateY(-20px);">
+          Invalid Password
+        </div>
+        <div class="btn-wrapper">
+          <button class="btn" id="login-button">
+            <a class="login2" data-translate="LOGIN_BUTTON">LOGIN</a>
+          </button>
+        </div>
+      </form>
+    </div>
+  </section>
+  <style>
+    .login-error-msg {
+      color: #ff3e3e;
+      text-align: center;
+      margin-bottom: 10px;
+      font-weight: bold;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+  </style>

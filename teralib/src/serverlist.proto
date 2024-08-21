@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+message ServerList {
+    message ServerInfo {
+        fixed32 id = 1;
+        bytes name = 2;
+        bytes category = 3;
+        bytes title = 4;
+        bytes queue = 5;
+        bytes population = 6;
+        fixed32 address = 7;
+        fixed32 port = 8;
+        fixed32 available = 9;
+        bytes unavailable_message = 10;
+        bytes host = 11;
+    }
+
+    repeated ServerInfo servers = 1;
+    fixed32 last_server_id = 2;
+    fixed32 sort_criterion = 3;
+}

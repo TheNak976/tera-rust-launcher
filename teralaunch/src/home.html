@@ -1,0 +1,141 @@
+<main class="content" id="home-page">
+  <section class="home-container">
+    <div class="home-wrapper">
+      <div class="home-content">
+        <div class="news-block-parent">
+          <div class="logo-wrapper">
+            <div class="logo-background">
+              <img class="tera-logo-icon" loading="lazy" alt="" src="./assets/tera-logo@2x.png" />
+            </div>
+            <div class="news-block">
+              <div class="text-conten">
+                <div class="slider-container">
+                  <div class="swiper-container news-slider">
+                    <div class="swiper-wrapper">
+                      <!-- Slide 1 -->
+                      <div class="swiper-slide">
+                        <img src="https://cs-live-static-psap.krapaas.com/console/tera/brand-site/admin/TERA_FullGame_3840x2160_CN.jpg" alt="News 1">
+                        <div class="slide-content">
+                          <h3>Action Combat System</h3>
+                          <p>Experience real-time battles with precision aiming and dodging!</p>
+                        </div>
+                      </div>
+                      <!-- Slide 2 -->
+                      <div class="swiper-slide">
+                        <img src="https://cs-live-static-psap.krapaas.com/console/tera/brand-site/admin/3named_01.jpg" alt="News 2">
+                        <div class="slide-content">
+                          <h3>Intense PvP Action</h3>
+                          <p>Engage in battlegrounds, duels, and open-world PvP for glory and rewards!</p>
+                        </div>
+                      </div>
+                      <!-- Slide 3 -->
+                      <div class="swiper-slide">
+                        <img src="https://cs-live-static-psap.krapaas.com/console/tera/brand-site/admin/GG_002.jpg" alt="News 3">
+                        <div class="slide-content">
+                          <h3>Epic Boss Battles</h3>
+                          <p>Challenge massive BAMs (Big-Ass Monsters) in thrilling group encounters!</p>
+                        </div>
+                      </div>
+                    </div>
+                    <!-- Add pagination -->
+                    <div class="swiper-pagination"></div>
+                    <!-- Add navigation buttons -->
+                    <div class="swiper-button-prev"></div>
+                    <div class="swiper-button-next"></div>
+                  </div>
+                </div>
+
+
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="user-panel">
+        <div class="btn-user-avatar">
+          <img class="user-icon-one" loading="lazy" alt="" src="./assets/vector.svg" />
+
+          <img class="user-icon-two" loading="lazy" alt="" src="./assets/vector-1.svg" />
+        </div>
+        <div class="dropdown-panel-wrapper">
+          <div class="dropdown-panel">
+            <div class="user-name-container">
+              <span class="hey">Hey! </span>
+              <span class="username" id="userName">Zanatan97</span>
+            </div>
+            <div class="menu-divider"></div>
+            <nav class="user-menu">
+              <a href="#" class="menu-item" data-translate="ACCOUNT_DETAILS">ACCOUNT DETAILS</a>
+              <a href="#" class="menu-item" id="openModal" data-translate="SETTINGS">SETTINGS</a>
+              <a href="#" class="menu-item" id="logout-link" data-translate="SIGN_OUT">SIGN OUT</a>
+              <a href="#" class="menu-item" id="app-quit" data-translate="EXIT">EXIT</a>
+            </nav>
+          </div>
+        </div>
+      </div>
+    </div>
+    </div>
+    <div class="game-status">
+      <div class="game-progress-parent">
+        <div class="game-progress">
+          <div class="progress-container">
+            <div class="content-parent-parent">
+              <div class="content-parent">
+                <div class="dl-status-string" id="dl-status-string">
+                  <span id="status-string"></span>
+                  <span id="files-progress"></span>
+                  <span id="size-progress">
+                    <span id="downloaded-size"></span>
+                    <span id="total-size"></span>
+                  </span>
+                </div>
+              </div>
+              <div class="dl-status-percentage" id="progress-percentage"></div>
+            </div>
+            <div class="outer-progress">
+              <div class="inner-progress" id="progress-percentage-div" style="width: 0%;"><span id="current-file">current-file :S1Game/CookedPC/Sound_Data/Packages/PC_Skill.gpk</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="btn-pause" style="display: none;">
+          <img class="pause-icon" alt="" src="./assets/pause-icon.svg" />
+        </div>
+        <div class="btn-restart" style="display: none;">
+          <img class="vector-icon" loading="lazy" alt="" src="./assets/vector-3.svg" />
+        </div>
+        <div class="launch-game-parent">
+          <button class="btn-launch-game" id="launch-game-btn">
+            <b class="launch-game" data-translate="LAUNCH_GAME">LAUNCH GAME</b>
+          </button>
+        </div>
+      </div>
+      <div class="download-info">
+        <div class="download-speed" id="download-speed-div">
+          <div class="dl-speed-string" data-translate="SPEED_LABEL">Speed:</div>
+          <div class="speed-value-container">
+            <div class="dl-speed-number" id="download-speed">--</div>
+          </div>
+          <div class="tr-string" data-translate="TIME_REMAINING_LABEL">Time remaining:</div>
+          <div class="tr-time" id="time-remaining">--</div>
+        </div>
+        <div class="client-version-container">
+          <div class="client-version-parent">
+            <div class="client-version" data-translate="CLIENT_VERSION">Client Version:</div>
+            <div class="v-10002">V 100.02</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+
+<div id="modal" class="modal">
+  <div class="modal-content">
+    <h2 data-translate="CHOOSE_GAME_FOLDER">Choose Your Game Folder</h2>
+    <p data-translate="CLICK_INPUT_INSTRUCTION">Just click inside the input</p>
+    <span class="close">&times;</span>
+    <input type="text" id="gameFolder" data-translate-placeholder="LOCATE_GAME_FOLDER">
+    <div id="notification" class="notification"></div>
+  </div>
+</div>

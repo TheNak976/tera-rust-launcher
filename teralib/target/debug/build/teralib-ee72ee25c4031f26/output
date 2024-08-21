@@ -1,0 +1,3 @@
+cargo:rerun-if-changed=src/serverlist.proto
+OUT_DIR: c:\Users\Shadow\Documents\GitHub\GoProject\terarustlib\teralib\target\debug\build\teralib-ee72ee25c4031f26\out
+Proto compilation failed: Custom { kind: NotFound, error: "Could not find `protoc`. If `protoc` is installed, try setting the `PROTOC` environment variable to the path of the `protoc` binary. Try installing `protobuf-compiler` or `protobuf` using your package manager. It is also available at https://github.com/protocolbuffers/protobuf/releases  For more information: https://docs.rs/prost-build/#sourcing-protoc" }

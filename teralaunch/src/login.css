@@ -1,0 +1,181 @@
+.tera-logo-1-icon {
+  height: 133px;
+  flex: 1;
+  position: relative;
+  max-width: 100%;
+  overflow: hidden;
+  object-fit: cover;
+}
+.tera-logo-1-wrapper {
+  align-self: stretch;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 0 10px;
+}
+.login1 {
+  text-decoration: none;
+  position: relative;
+  font-size: 24px;
+  font-weight: 700;
+  font-family: Raleway;
+  color: #fff;
+  text-align: left;
+  display: inline-block;
+  min-width: 65px;
+}
+.login-wrapper {
+  width: 263px;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 0 1px 0 0;
+  box-sizing: border-box;
+}
+.input-text,
+.input-text1 {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  outline: 0;
+  background-color: rgba(255, 255, 255, 0.08);
+  align-self: stretch;
+  height: 39px;
+  box-sizing: border-box;
+  flex-direction: row;
+  padding: 11.5px 15px;
+  font-family: Raleway;
+  font-weight: 500;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.4);
+  min-width: 154px;
+}
+.input-fields,
+.input-fields-wrapper,
+.input-text,
+.input-text1 {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+.input-fields {
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+}
+.input-fields-wrapper {
+  width: 263px;
+  flex-direction: row;
+  padding: 0 3px 0 2px;
+  box-sizing: border-box;
+}
+.login2 {
+  text-decoration: none;
+  position: relative;
+  font-size: 16px;
+  font-weight: 700;
+  font-family: Raleway;
+  color: #49231a;
+  text-align: left;
+  display: inline-block;
+  min-width: 50px;
+}
+.btn, .btn-wrapper {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+}
+.btn {
+  cursor: pointer;
+  border: 2px solid rgba(247, 183, 0, 0.49);
+  padding: 10px 56px 10px 59px;
+  background-color: #eab213;
+  flex: 1;
+  box-shadow: 0 0 35px rgba(255, 171, 46, 0.35);
+  border-radius: 5px;
+  mix-blend-mode: normal;
+}
+.btn:hover {
+  background-color: #b88000;
+  border: 2px solid rgba(196, 133, 0, 0.49);
+  box-sizing: border-box;
+}
+.btn-wrapper {
+  width: 100%;
+  padding: 0 10px 0 10px;
+  box-sizing: border-box;
+}
+.invalid-password {
+  position: relative;
+  font-size: 16px;
+  font-family: Raleway;
+  text-align: left;
+}
+.login-error-msg,
+.login-form,
+.login-form-container {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+.login-error-msg {
+  background-color: rgb(255 62 62 / 22%);
+  color: #c17070;
+  text-align: center;
+  padding: 10px;
+  margin-bottom: 10px;
+  border-radius: 5px;
+  font-weight: bold;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.login-form,
+.login-form-container {
+  flex-direction: column;
+}
+.login-form {
+  margin: 0;
+  align-self: stretch;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(33px);
+  border-radius: 10px;
+  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.2) 61.5%),
+    rgba(255, 255, 255, 0.04);
+  border: 4px solid rgba(255, 255, 255, 0.04);
+  padding: 40px 31px 33px;
+  gap: 30px;
+}
+.login-form-container {
+  width: 333px;
+  gap: 22px;
+  max-width: 100%;
+}
+.login-form-container-wrapper {
+  align-self: stretch;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: center;
+  max-width: 100%;
+}
+.login {
+  width: 1282px;
+  height: 759px;
+  position: relative;
+  border-radius: 5px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 8px 23px 171px 50px;
+  box-sizing: border-box;
+  gap: 5px;
+  background-image: url(./assets/login@3x.png);
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: top;
+  letter-spacing: normal;
+  line-height: normal;
+}

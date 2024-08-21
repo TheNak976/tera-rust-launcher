@@ -1,0 +1,49 @@
+{
+  "build": {
+    "devPath": "../src",
+    "distDir": "../src",
+    "withGlobalTauri": true
+  },
+  "package": {
+    "productName": "teralauncher",
+    "version": "0.0.0"
+  },
+  "tauri": {
+    "allowlist": {
+
+      "all": true,
+      "shell": {
+        "all": false,
+        "open": true
+      }
+    },
+    "windows": [
+      {
+        "title": "Tera Launcher",
+        "width": 1282,
+        "height": 759,
+        "resizable":false,
+        "decorations":false,
+        "transparent":true,
+        "center":true,
+        "contentProtected":false,
+        "url": "index.html"
+        
+      }
+    ],
+    "security": {
+      "csp": null
+    },
+    "bundle": {
+      "active": true,
+      "targets": "all",
+      "identifier": "com.teralib.dev",
+      "icon": [
+        "icons/tera_server.png",
+        "icons/tera_server.ico"
+      ],
+      "copyright": "Tera Launcher",
+      "shortDescription": "A Tauri Launcher for Tera Pserver"
+    }
+  }
+}
