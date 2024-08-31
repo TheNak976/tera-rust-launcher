@@ -22,6 +22,7 @@ use serde_json::{json, Value};
 use tauri::{Manager};
 use tauri::api::dialog::FileDialogBuilder;
 use teralib::{get_game_status_receiver, run_game, reset_global_state};
+use teralib::config::get_config_value;
 use reqwest::Client;
 use lazy_static::lazy_static;
 use ini::Ini;
@@ -80,6 +81,15 @@ lazy_static! {
     });
 }
 
+
+
+/* const CONFIG: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/config/config.json"));
+
+lazy_static::lazy_static! {
+    static ref CONFIG_JSON: Value = serde_json::from_str(CONFIG).expect("Failed to parse config");
+} */
+
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct FileInfo {
     path: String,
@@ -123,11 +133,17 @@ struct GameState {
 }
 
 
-static INIT: Once = Once::new();
+//static INIT: Once = Once::new();
+
+
 lazy_static! {
     static ref HASH_CACHE: Mutex<HashMap<String, CachedFileInfo>> = Mutex::new(HashMap::new());
 }
 
+
+/* fn get_config_value(key: &str) -> String {
+    CONFIG_JSON[key].as_str().expect(&format!("{} must be set in config.json", key)).to_string()
+} */
 
 fn is_ignored(path: &Path, game_path: &Path, ignored_paths: &HashSet<&str>) -> bool {
     let relative_path = path.strip_prefix(game_path).unwrap().to_str().unwrap().replace("\\", "/");
@@ -201,29 +217,29 @@ fn load_cache_from_disk() -> Result<HashMap<String, CachedFileInfo>, String> {
 
 
 fn get_hash_file_url() -> String {
-    env::var("HASH_FILE_URL").expect("HASH_FILE_URL must be set")
+    get_config_value("HASH_FILE_URL")
 }
 
 fn get_files_server_url() -> String {
-    env::var("FILE_SERVER_URL").expect("FILE_SERVER_URL must be set")
+    get_config_value("FILE_SERVER_URL")
 }
 
 fn find_config_file() -> Option<PathBuf> {
     let current_dir = env::current_dir().ok()?;
-    let config_in_current = current_dir.join("config.ini");
+    let config_in_current = current_dir.join("tera_config.ini");
     if config_in_current.exists() {
         return Some(config_in_current);
     }
 
     let parent_dir = current_dir.parent()?;
-    let config_in_parent = parent_dir.join("config.ini");
+    let config_in_parent = parent_dir.join("tera_config.ini");
     if config_in_parent.exists() {
         return Some(config_in_parent);
     }
 
     if let Ok(exe_path) = env::current_exe() {
         if let Some(exe_dir) = exe_path.parent() {
-            let config_in_exe_dir = exe_dir.join("config.ini");
+            let config_in_exe_dir = exe_dir.join("tera_config.ini");
             if config_in_exe_dir.exists() {
                 return Some(config_in_exe_dir);
             }
@@ -336,7 +352,7 @@ async fn generate_hash_file(window: tauri::Window) -> Result<String, String> {
                 hasher.update(&contents);
                 let hash = format!("{:x}", hasher.finalize());
                 let size = contents.len() as u64;
-                let file_server_url = env::var("FILE_SERVER_URL").expect("FILE_SERVER_URL must be set");
+                let file_server_url = get_config_value("FILE_SERVER_URL");
                 let url = format!("{}/files/{}", file_server_url, relative_path);
 
                 files.blocking_lock().push(FileInfo {
@@ -431,10 +447,19 @@ fn save_game_path_to_config(path: String) -> Result<(), String> {
 
 #[tauri::command]
 fn get_game_path_from_config() -> Result<String, String> {
-    let game_path = get_game_path()?;
-    game_path.to_str()
-        .ok_or_else(|| "Invalid UTF-8 in game path".to_string())
-        .map(|s| s.to_string())
+    match get_game_path() {
+        Ok(game_path) => game_path
+            .to_str()
+            .ok_or_else(|| "Invalid UTF-8 in game path".to_string())
+            .map(|s| s.to_string()),
+        Err(e) => {
+            if e.contains("Config file not found") {
+                Err("tera_config.ini is missing".to_string())
+            } else {
+                Err(e)
+            }
+        }
+    }
 }
 
 #[tauri::command]
@@ -606,7 +631,9 @@ async fn get_files_to_update(window: tauri::Window) -> Result<Vec<FileInfo>, Str
     let start_time = Instant::now();
     let server_hash_file = get_server_hash_file().await?;
 
-    // Obtenir le chemin du jeu
+    // Get the path to the game folder, which is the folder that contains the Tera game
+    // files. This is the folder that we will be comparing with the server hash file
+    // to determine which files need to be updated.
     let local_game_path = get_game_path()?;
     println!("Local game path: {:?}", local_game_path);
 
@@ -859,8 +886,6 @@ async fn handle_launch_game(
     Ok("Game launch initiated".to_string())
 }
 
-
-
 #[tauri::command]
 fn get_language_from_config() -> Result<String, String> {
     info!("Attempting to read language from config file");
@@ -910,7 +935,7 @@ fn set_auth_info(auth_key: String, user_name: String, user_no: i32, character_co
 #[tauri::command]
 async fn login(username: String, password: String) -> Result<String, String> {
     let client = Client::new();
-    let url = env::var("LOGIN_ACTION_URL").expect("LOGIN_ACTION_URL must be set");
+    let url = get_config_value("LOGIN_ACTION_URL");
 
     let payload = format!("login={}&password={}", username, password);
 

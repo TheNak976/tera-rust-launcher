@@ -6,14 +6,13 @@
   },
   "package": {
     "productName": "teralauncher",
-    "version": "0.0.0"
+    "version": "0.0.6"
   },
   "tauri": {
     "allowlist": {
-
       "all": true,
       "shell": {
-        "all": false,
+        "all": true,
         "open": true
       }
     },
@@ -22,13 +21,12 @@
         "title": "Tera Launcher",
         "width": 1282,
         "height": 759,
-        "resizable":false,
-        "decorations":false,
-        "transparent":true,
-        "center":true,
-        "contentProtected":false,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "center": true,
+        "contentProtected": false,
         "url": "index.html"
-        
       }
     ],
     "security": {

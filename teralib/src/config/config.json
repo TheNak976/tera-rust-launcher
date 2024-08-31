@@ -1,0 +1,6 @@
+{
+    "LOGIN_ACTION_URL": "http://SERVERIP-URI/tera/LauncherLoginAction",
+    "HASH_FILE_URL": "http://SERVERIP-URI/tera/launcher/hash-file.json",
+    "FILE_SERVER_URL": "http://SERVERIP-URI/public",
+    "SERVER_LIST_URL": "http://SERVERIP-URI/tera/ServerList.json?lang=en&sort=3"
+  }

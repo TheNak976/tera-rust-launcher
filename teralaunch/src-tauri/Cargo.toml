@@ -19,7 +19,7 @@ parking_lot = "0.12.1"
 tokio = { version = "1.37.0", features = ["full"] }
 tokio-macros = "2.2.0"
 log = "0.4.22"
-reqwest = { version = "0.12.5", features = ["json", "stream"] }
+reqwest = { version = "0.12.7", features = ["json", "stream"] }
 lazy_static = "1.4.0"
 rust-ini = "0.21.0"
 sha2 = "0.10.8"

@@ -1000,8 +1000,8 @@ const App = {
         }
 
         if (loginErrorMsg) {
-            loginErrorMsg.style.display = 'flex';
-            loginErrorMsg.style.opacity = 1;
+            loginErrorMsg.style.display = 'none';
+            loginErrorMsg.style.opacity = 0;
         }
 
         try {
@@ -1009,7 +1009,7 @@ const App = {
             const response = await invoke('login', { username, password });
             const jsonResponse = JSON.parse(response);
 
-            if (jsonResponse.Return && jsonResponse.Msg === "success") {
+            if (jsonResponse && jsonResponse.Return && jsonResponse.Msg === "success") {
                 this.storeAuthInfo(jsonResponse);
                 console.log('Login success');
 
@@ -1026,25 +1026,25 @@ const App = {
                     return;
                 }
 
-
                 // Check server connection after successful login
                 const isConnected = await this.checkServerConnection();
-
                 if (isConnected) {
                     console.log('Login success 2');
-                    await this.initializeAndCheckUpdates(true)
+                    await this.initializeAndCheckUpdates(true);
                     await this.Router.navigate('home');
                 } else {
                     throw new Error(this.t('SERVER_CONNECTION_ERROR'));
                 }
             } else {
-                throw new Error(jsonResponse.Msg || this.t('LOGIN_ERROR'));
+                const errorMessage = jsonResponse ? (jsonResponse.Msg || this.t('LOGIN_ERROR')) : this.t('LOGIN_ERROR');
+                throw new Error(errorMessage);
             }
         } catch (error) {
             console.error('Error during login:', error);
             if (loginErrorMsg) {
                 loginErrorMsg.textContent = error.message || this.t('SERVER_CONNECTION_ERROR');
-                loginErrorMsg.style.display = 'block';
+                loginErrorMsg.style.display = 'flex';
+                loginErrorMsg.style.opacity = 1;
             }
         } finally {
             this.setState({ isLoggingIn: false });
@@ -2368,11 +2368,18 @@ const App = {
         } catch (error) {
             console.error('Error loading game path:', error);
             // Display the error in a Windows system message
-            const errorMessage = `${this.t('GAME_PATH_LOAD_ERROR')} ${error.message}`;
+            let errorMessage;
+            if (error && error.message && typeof error.message === 'string' && error.message.toLowerCase().includes('tera_config.ini')) {
+                errorMessage = this.t('CONFIG_INI_MISSING');
+            } else {
+                errorMessage = `${this.t('GAME_PATH_LOAD_ERROR')} ${error && error ? error : ''}`;
+            }
+            
             const userResponse = await message(
                 errorMessage,
                 { title: this.t('ERROR'), type: 'error' }
             );
+            
             if (userResponse) {
                 this.appQuit();
             }

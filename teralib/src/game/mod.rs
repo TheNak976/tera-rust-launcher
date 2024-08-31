@@ -17,8 +17,7 @@ use winapi::shared::minwindef::{BOOL, LPARAM, LRESULT, TRUE, UINT, WPARAM};
 use winapi::shared::windef::HWND;
 use winapi::um::libloaderapi::GetModuleHandleW;
 use winapi::um::winuser::*;
-use dotenv::dotenv;
-use std::env;
+use crate::config;
 use std::process::ExitStatus;
 use crate::global_credentials::{GLOBAL_CREDENTIALS, set_credentials};
 use reqwest;
@@ -671,7 +670,7 @@ fn on_world_entered(world_name: &str) {
 /// A Result containing a Vec<u8> of the encoded server list on success, or an error on failure.
 async fn get_server_list() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     
-    let url = env::var("SERVER_LIST_URL").expect("SERVER_LIST_URL must be set");
+    let url = config::get_config_value("SERVER_LIST_URL");
     let client = reqwest::Client::new();
     let response = client
         .get(url)
