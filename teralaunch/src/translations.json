@@ -56,7 +56,8 @@
     "GAME_ENDED": "Le jeu s'est terminé",
     "SPEED_LABEL": "Vitesse :",
     "TIME_REMAINING_LABEL": "Temps restant :",
-    "FOLDER_SAVED_SUCCESS": "Dossier enregistré avec succès !"
+    "FOLDER_SAVED_SUCCESS": "Dossier enregistré avec succès !",
+    "GAME_LAUNCH_ERROR": "Erreur lors du lancement du jeu: "
   },
   "EUR": {
     "LOGIN_TITLE": "Login",
@@ -115,7 +116,8 @@
     "GAME_ENDED": "Game has ended",
     "SPEED_LABEL": "Speed:",
     "TIME_REMAINING_LABEL": "Time remaining:",
-    "FOLDER_SAVED_SUCCESS": "Folder saved successfully!"
+    "FOLDER_SAVED_SUCCESS": "Folder saved successfully!",
+    "GAME_LAUNCH_ERROR": "Error launching game: "
   },
   "RUS": {
     "LOGIN_TITLE": "Вход",
@@ -174,7 +176,8 @@
     "GAME_ENDED": "Игра завершена",
     "SPEED_LABEL": "Скорость:",
     "TIME_REMAINING_LABEL": "Оставшееся время:",
-    "FOLDER_SAVED_SUCCESS": "Папка успешно сохранена!"
+    "FOLDER_SAVED_SUCCESS": "Папка успешно сохранена!",
+    "GAME_LAUNCH_ERROR": "Ошибка при запуске игры: "
   },
   "GER": {
     "LOGIN_TITLE": "Anmelden",
@@ -193,7 +196,7 @@
     "CHOOSE_GAME_FOLDER": "Wählen Sie Ihren Spielordner",
     "CLICK_INPUT_INSTRUCTION": "Klicken Sie einfach in das Eingabefeld",
     "GAME_PATH_LOAD_ERROR": "Fehler beim Laden des Spielpfads:",
-    "CONFIG_INI_MISSING":"Die Datei config.ini fehlt. Bitte überprüfen Sie Ihre Installation.",
+    "CONFIG_INI_MISSING": "Die Datei config.ini fehlt. Bitte überprüfen Sie Ihre Installation.",
     "WELCOME_TO_LAUNCHER": "Willkommen beim Launcher!",
     "FIRST_LAUNCH_MESSAGE": "Es scheint, dass dies Ihre erste Nutzung ist. Lassen Sie uns damit beginnen, den Spielpfad einzurichten.",
     "SET_GAME_PATH": "Spielpfad festlegen",
@@ -233,6 +236,7 @@
     "GAME_ENDED": "Spiel wurde beendet",
     "SPEED_LABEL": "Geschwindigkeit:",
     "TIME_REMAINING_LABEL": "Verbleibende Zeit:",
-    "FOLDER_SAVED_SUCCESS": "Ordner erfolgreich gespeichert!"
+    "FOLDER_SAVED_SUCCESS": "Ordner erfolgreich gespeichert!",
+    "GAME_LAUNCH_ERROR": "Fehler beim Starten des Spiels: "
   }
 }

@@ -147,7 +147,7 @@ lazy_static! {
 
 fn is_ignored(path: &Path, game_path: &Path, ignored_paths: &HashSet<&str>) -> bool {
     let relative_path = path.strip_prefix(game_path).unwrap().to_str().unwrap().replace("\\", "/");
-    
+
     // Ignore files at the root
     if relative_path.chars().filter(|&c| c == '/').count() == 0 {
         return true;
@@ -434,7 +434,7 @@ fn get_game_path() -> Result<PathBuf, String> {
 #[tauri::command]
 fn save_game_path_to_config(path: String) -> Result<(), String> {
     let config_path = find_config_file().ok_or("Config file not found")?;
-    let mut conf = Ini::load_from_file(&config_path).map_err(|e| 
+    let mut conf = Ini::load_from_file(&config_path).map_err(|e|
         format!("Failed to load config: {}", e)
     )?;
 
@@ -477,7 +477,7 @@ async fn update_file(
     file_info: FileInfo,
     total_files: usize,
     current_file_index: usize,
-    total_size: u64, 
+    total_size: u64,
     downloaded_size: u64,
 ) -> Result<u64, String> {
     let game_path = get_game_path()?;
@@ -528,7 +528,7 @@ async fn update_file(
                 current_file_index,
             };
 
-            println!("Current file: {}, Download speed: {}/s, Progress: {:.2}%", 
+            println!("Current file: {}, Download speed: {}/s, Progress: {:.2}%",
                      file_info.path, format_bytes(speed), progress_payload.progress);
 
             if let Err(e) = window.emit("download_progress", &progress_payload) {
@@ -546,7 +546,7 @@ async fn update_file(
     if downloaded_hash != file_info.hash {
         return Err(format!("Hash mismatch for file: {}", file_info.path));
     }
-    
+
     // Emit a final event for this file
     let final_progress_payload = ProgressPayload {
         file_name: file_info.path.clone(),
@@ -563,7 +563,7 @@ async fn update_file(
     }
 
     println!("File download completed: {}", file_info.path);
-    
+
     Ok(downloaded)
 }
 
@@ -674,7 +674,7 @@ async fn get_files_to_update(window: tauri::Window) -> Result<Vec<FileInfo>, Str
                     elapsed_time: start_time.elapsed().as_secs_f64(),
                     files_to_update: files_to_update_count.load(Ordering::SeqCst),
                 };
-            
+
                 let _ = window.emit("file_check_progress", progress_payload)
                     .map_err(|e| {
                         println!("Error emitting file_check_progress event: {}", e);
@@ -1011,7 +1011,7 @@ fn main() {
             }
         }
     });
-  
+
 
     let game_status_receiver = get_game_status_receiver();
     let game_state = GameState {

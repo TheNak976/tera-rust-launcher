@@ -1,37 +1,55 @@
 // External crate imports
+use crate::{
+    config,
+    global_credentials::{set_credentials, GLOBAL_CREDENTIALS},
+};
 use lazy_static::lazy_static;
-use log::{error, info,Record, Level, Metadata};
+use log::{error, info, Level, Metadata, Record};
 use once_cell::sync::Lazy;
 use prost::Message;
-use winapi::um::errhandlingapi::GetLastError;
-use std::ffi::OsStr;
-use std::os::windows::ffi::OsStrExt;
-use std::process::Command;
-use std::ptr::null_mut;
-use std::slice;
-use std::sync::mpsc;
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
-use tokio::runtime::Runtime;
-use winapi::shared::minwindef::{BOOL, LPARAM, LRESULT, TRUE, UINT, WPARAM};
-use winapi::shared::windef::HWND;
-use winapi::um::libloaderapi::GetModuleHandleW;
-use winapi::um::winuser::*;
-use crate::config;
-use std::process::ExitStatus;
-use crate::global_credentials::{GLOBAL_CREDENTIALS, set_credentials};
 use reqwest;
 use serde_json::Value;
-use std::sync::atomic::{AtomicBool, Ordering};
-use tokio::sync::{watch, Notify, mpsc as other_mpsc};
-use winapi::um::winuser::GetClassInfoExW;
+use std::{
+    ffi::OsStr,
+    os::windows::ffi::OsStrExt,
+    process::{Command, ExitStatus},
+    ptr::null_mut,
+    slice,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        mpsc, {Arc, Mutex},
+    },
+    time::Duration,
+};
+use tokio::{
+    runtime::Runtime,
+    sync::{mpsc as other_mpsc, watch, Notify},
+};
+use winapi::{
+    shared::{
+        minwindef::{BOOL, LPARAM, LRESULT, TRUE, UINT, WPARAM},
+        windef::HWND,
+    },
+    um::{
+        errhandlingapi::GetLastError,
+        libloaderapi::GetModuleHandleW,
+        winuser::{GetClassInfoExW, *},
+    },
+};
 
 // Constants
 const WM_GAME_EXITED: u32 = WM_USER + 1;
 
-// Module includes
+/// Module for handling server list functionality.
+///
+/// This module includes the generated code from the `_serverlist_proto.rs` file,
+/// which likely contains protobuf-generated structures and functions for
+/// managing server list data.
 mod serverlist {
-    include!(concat!(env!("CARGO_MANIFEST_DIR"), "\\src\\_serverlist_proto.rs"));
+    include!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "\\src\\_serverlist_proto.rs"
+    ));
 }
 use serverlist::{server_list::ServerInfo, ServerList};
 
@@ -40,9 +58,22 @@ lazy_static! {
     static ref SERVER_LIST_SENDER: Mutex<Option<mpsc::Sender<(WPARAM, usize)>>> = Mutex::new(None);
 }
 
+/// Handle to the game window.
+///
+/// This static variable holds a mutex-protected optional `SafeHWND`,
+/// which represents the handle to the game window.
 static WINDOW_HANDLE: Lazy<Mutex<Option<SafeHWND>>> = Lazy::new(|| Mutex::new(None));
 
+/// Flag indicating whether the game is currently running.
+///
+/// This atomic boolean is used to track the running state of the game
+/// across multiple threads.
 static GAME_RUNNING: Lazy<AtomicBool> = Lazy::new(|| AtomicBool::new(false));
+
+/// Sender for game status updates.
+///
+/// This channel sender is used to broadcast changes in the game's running state
+/// to any interested receivers.
 static GAME_STATUS_SENDER: Lazy<watch::Sender<bool>> = Lazy::new(|| {
     let (tx, _) = watch::channel(false);
     tx
@@ -57,24 +88,67 @@ unsafe impl Send for SafeHWND {}
 unsafe impl Sync for SafeHWND {}
 
 impl SafeHWND {
+    /// Creates a new `SafeHWND` instance.
+    ///
+    /// This function wraps a raw `HWND` into a `SafeHWND` struct, providing a safer interface
+    /// for handling window handles.
+    ///
+    /// # Arguments
+    ///
+    /// * `hwnd` - A raw window handle of type `HWND`.
+    ///
+    /// # Returns
+    ///
+    /// A new `SafeHWND` instance containing the provided window handle.
     fn new(hwnd: HWND) -> Self {
         SafeHWND(hwnd)
     }
 
+    /// Retrieves the raw window handle.
+    ///
+    /// This method provides access to the underlying `HWND` stored in the `SafeHWND` instance.
+    ///
+    /// # Returns
+    ///
+    /// The raw `HWND` window handle.
     fn get(&self) -> HWND {
         self.0
     }
 }
 
+/// A custom logger for the Tera application.
+///
+/// This struct implements the `log::Log` trait and provides a way to send log messages
+/// through a channel, allowing for asynchronous logging.
 pub struct TeraLogger {
+    /// The sender half of a channel for log messages.
     sender: other_mpsc::Sender<String>,
 }
 
 impl log::Log for TeraLogger {
+    /// Checks if a log message with the given metadata should be recorded.
+    ///
+    /// This method filters log messages based on the target and log level.
+    ///
+    /// # Arguments
+    ///
+    /// * `metadata` - The metadata associated with the log record.
+    ///
+    /// # Returns
+    ///
+    /// `true` if the log message should be recorded, `false` otherwise.
     fn enabled(&self, metadata: &Metadata) -> bool {
         metadata.target().starts_with("teralib") && metadata.level() <= Level::Info
     }
 
+    /// Records a log message.
+    ///
+    /// If the log message is enabled based on its metadata, this method formats the message
+    /// and sends it through the channel.
+    ///
+    /// # Arguments
+    ///
+    /// * `record` - The log record to be processed.
     fn log(&self, record: &Record) {
         if self.enabled(record.metadata()) {
             let log_message = format!("{} - {}", record.level(), record.args());
@@ -82,10 +156,11 @@ impl log::Log for TeraLogger {
         }
     }
 
+    /// Flushes any buffered records.
+    ///
+    /// This implementation does nothing as there is no buffering.
     fn flush(&self) {}
 }
-
-
 
 /// Sets up logging for the application.
 ///
@@ -95,9 +170,6 @@ pub fn setup_logging() -> (TeraLogger, other_mpsc::Receiver<String>) {
     let (sender, receiver) = other_mpsc::channel(100);
     (TeraLogger { sender }, receiver)
 }
-
-
-
 
 /// Runs the game with the provided credentials and language.
 ///
@@ -113,7 +185,13 @@ pub fn setup_logging() -> (TeraLogger, other_mpsc::Receiver<String>) {
 /// # Returns
 ///
 /// A Result containing the exit status of the game process or an error.
-pub async fn run_game(account_name: &str, characters_count:&str, ticket: &str, game_lang: &str, game_path: &str) -> Result<ExitStatus, Box<dyn std::error::Error>> {
+pub async fn run_game(
+    account_name: &str,
+    characters_count: &str,
+    ticket: &str,
+    game_lang: &str,
+    game_path: &str,
+) -> Result<ExitStatus, Box<dyn std::error::Error>> {
     info!("Starting run_game function");
 
     if is_game_running() {
@@ -151,7 +229,10 @@ async fn launch_game() -> Result<ExitStatus, Box<dyn std::error::Error>> {
     GAME_STATUS_SENDER.send(true).unwrap();
     info!("Game status set to running");
 
-    info!("Launching game for account: {}", GLOBAL_CREDENTIALS.get_account_name());
+    info!(
+        "Launching game for account: {}",
+        GLOBAL_CREDENTIALS.get_account_name()
+    );
 
     let (tx, rx) = mpsc::channel::<(WPARAM, usize)>();
     *SERVER_LIST_SENDER.lock().unwrap() = Some(tx);
@@ -159,7 +240,8 @@ async fn launch_game() -> Result<ExitStatus, Box<dyn std::error::Error>> {
     let tcs = Arc::new(tokio::sync::Notify::new());
     let tcs_clone = Arc::clone(&tcs);
 
-    let handle = tokio::task::spawn_blocking(move || unsafe { create_and_run_game_window(tcs_clone) });
+    let handle =
+        tokio::task::spawn_blocking(move || unsafe { create_and_run_game_window(tcs_clone) });
 
     tokio::spawn(async move {
         while let Ok((w_param, sender)) = rx.recv() {
@@ -171,10 +253,12 @@ async fn launch_game() -> Result<ExitStatus, Box<dyn std::error::Error>> {
 
     tcs.notified().await;
 
-    let mut child = Command::new(GLOBAL_CREDENTIALS.get_game_path(),
-    )
-    .arg(format!("-LANGUAGEEXT={}", GLOBAL_CREDENTIALS.get_game_lang()))
-    .spawn()?;
+    let mut child = Command::new(GLOBAL_CREDENTIALS.get_game_path())
+        .arg(format!(
+            "-LANGUAGEEXT={}",
+            GLOBAL_CREDENTIALS.get_game_lang()
+        ))
+        .spawn()?;
 
     let pid = child.id();
     info!("Game process spawned with PID: {}", pid);
@@ -202,8 +286,6 @@ async fn launch_game() -> Result<ExitStatus, Box<dyn std::error::Error>> {
 
     Ok(status)
 }
-
-
 
 /// Converts a Rust string slice to a null-terminated wide string (UTF-16).
 ///
@@ -315,7 +397,7 @@ unsafe extern "system" fn wnd_proc(
                 }
             }
             1
-        },
+        }
         WM_GAME_EXITED => {
             info!("Received WM_GAME_EXITED in wnd_proc");
             PostQuitMessage(0);
@@ -342,7 +424,7 @@ unsafe fn create_and_run_game_window(tcs: Arc<Notify>) {
     let launcher_class_name = "LAUNCHER_CLASS";
     let launcher_window_title = "LAUNCHER_WINDOW";
     let class_name = to_wstring(launcher_class_name);
-    let window_name = to_wstring(&launcher_window_title);
+    let window_name = to_wstring(launcher_window_title);
     let wnd_class = WNDCLASSEXW {
         cbSize: std::mem::size_of::<WNDCLASSEXW>() as u32,
         style: 0,
@@ -414,7 +496,7 @@ unsafe fn create_and_run_game_window(tcs: Arc<Notify>) {
 
     let mut wcex: WNDCLASSEXW = std::mem::zeroed();
     wcex.cbSize = std::mem::size_of::<WNDCLASSEXW>() as u32;
-    
+
     EnumWindows(Some(enum_window_proc), class_name.as_ptr() as LPARAM);
 
     if GetClassInfoExW(GetModuleHandleW(null_mut()), class_name.as_ptr(), &mut wcex) != 0 {
@@ -477,8 +559,17 @@ unsafe extern "system" fn enum_window_proc(hwnd: HWND, lparam: LPARAM) -> BOOL {
 /// * `sender` - The sender's window handle as a HWND.
 /// * `game_event` - The event identifier as a usize.
 /// * `payload` - The data payload to be sent as a slice of bytes.
-unsafe fn send_response_message(recipient: WPARAM, sender: HWND, game_event: usize, payload: &[u8]) {
-    info!("Sending response message - Event: {}, Payload length: {}", game_event, payload.len());
+unsafe fn send_response_message(
+    recipient: WPARAM,
+    sender: HWND,
+    game_event: usize,
+    payload: &[u8],
+) {
+    info!(
+        "Sending response message - Event: {}, Payload length: {}",
+        game_event,
+        payload.len()
+    );
     let copy_data = COPYDATASTRUCT {
         dwData: game_event,
         cbData: payload.len() as u32,
@@ -508,7 +599,8 @@ unsafe fn send_response_message(recipient: WPARAM, sender: HWND, game_event: usi
 unsafe fn handle_account_name_request(recipient: WPARAM, sender: HWND) {
     let account_name = GLOBAL_CREDENTIALS.get_account_name();
     info!("Account Name Request - Sending: {}", account_name);
-    let account_name_utf16: Vec<u8> = account_name.encode_utf16()
+    let account_name_utf16: Vec<u8> = account_name
+        .encode_utf16()
         .flat_map(|c| c.to_le_bytes().to_vec())
         .collect();
     send_response_message(recipient, sender, 2, &account_name_utf16);
@@ -669,7 +761,6 @@ fn on_world_entered(world_name: &str) {
 ///
 /// A Result containing a Vec<u8> of the encoded server list on success, or an error on failure.
 async fn get_server_list() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    
     let url = config::get_config_value("SERVER_LIST_URL");
     let client = reqwest::Client::new();
     let response = client
@@ -684,32 +775,30 @@ async fn get_server_list() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
 
     let json: Value = response.json().await?;
     let server_list = parse_server_list_json(&json)?;
-    
+
     let mut buf = Vec::new();
     server_list.encode(&mut buf)?;
     Ok(buf)
 }
 
-/// Parses a JSON Value into a ServerList struct.
+/// Parses JSON into ServerList struct.
 ///
-/// This function takes a JSON representation of a server list and converts it
-/// into a strongly-typed ServerList struct. It performs thorough error checking
-/// to ensure all required fields are present and valid.
+/// Converts server list JSON to ServerList with error checking.
 ///
 /// # Arguments
 ///
-/// * `json` - A reference to a serde_json::Value containing the server list data.
+/// * `json` - Reference to serde_json::Value with server list data.
 ///
 /// # Returns
 ///
-/// * `Result<ServerList, Box<dyn std::error::Error>>` - A Result which is either:
-///   - Ok(ServerList): A fully populated ServerList struct
-///   - Err(Box<dyn std::error::Error>): An error describing what went wrong during parsing
+/// Result<ServerList, Box<dyn std::error::Error>>:
+/// - Ok(ServerList): Populated ServerList struct
+/// - Err: Parsing error description
 fn parse_server_list_json(json: &Value) -> Result<ServerList, Box<dyn std::error::Error>> {
     let mut server_list = ServerList {
         servers: vec![],
         last_server_id: 0,
-        sort_criterion: 3,
+        sort_criterion: 2,
     };
 
     // Parse GLOBAL_CREDENTIALS.get_characters_count()
@@ -717,56 +806,124 @@ fn parse_server_list_json(json: &Value) -> Result<ServerList, Box<dyn std::error
     info!("Raw credentials string: {}", credentials);
 
     let parts: Vec<&str> = credentials.split('|').collect();
-    
-    let player_last_server = parts.get(0).unwrap_or(&"0");
+
+    let player_last_server = parts.first().unwrap_or(&"0");
     let player_last_server_id = if parts.len() > 1 && !parts[1].is_empty() {
-        parts[1].split(',').next().unwrap_or("0").parse::<u32>().unwrap_or(0)
+        parts[1]
+            .split(',')
+            .next()
+            .unwrap_or("0")
+            .parse::<u32>()
+            .unwrap_or(0)
     } else {
         2800
     };
-    let player_characters_count = if parts.len() > 1 {
-        parts[1].split(',').nth(1).unwrap_or("0").parse::<u32>().unwrap_or(0)
+
+    // Parse character counts for each server
+    let character_counts: std::collections::HashMap<u32, u32> = if parts.len() > 1 {
+        parts[1]
+            .split(',')
+            .collect::<Vec<&str>>()
+            .chunks(2)
+            .filter_map(|chunk| {
+                if chunk.len() == 2 {
+                    Some((chunk[0].parse::<u32>().ok()?, chunk[1].parse::<u32>().ok()?))
+                } else {
+                    None
+                }
+            })
+            .collect()
     } else {
-        0
+        std::collections::HashMap::new()
     };
 
-    info!("Parsed values - Last server: {}, Last server ID: {}, Characters count: {}", 
-          player_last_server, player_last_server_id, player_characters_count);
+    info!(
+        "Parsed values - Last server: {}, Last server ID: {}, Character counts: {:?}",
+        player_last_server, player_last_server_id, character_counts
+    );
 
-    let display_count = if player_characters_count > 0 {
-        format!("({})", player_characters_count)
-    } else {
-        String::new()
-    };
-
-    info!("Display count string: '{}'", display_count);
-
-    let servers = json["servers"].as_array().ok_or("No servers found in JSON")?;
+    let servers = json["servers"]
+        .as_array()
+        .ok_or("No servers found in JSON")?;
     for server in servers {
-        let name = format!("{}{}", 
-            server["name"].as_str().ok_or("Missing or invalid 'name' field")?,
+        let server_id = server["id"]
+            .as_u64()
+            .ok_or("Missing or invalid 'id' field")? as u32;
+        let character_count = character_counts.get(&server_id).cloned().unwrap_or(0);
+
+        let json_available = server["available"].as_u64().unwrap_or(0);
+
+        info!(
+            "Processing server: id={}, name={}, json_available={}",
+            server_id, server["name"], json_available
+        );
+
+        let display_count = format!("({})", character_count);
+        let name = format!(
+            "{}{}",
+            server["name"]
+                .as_str()
+                .ok_or("Missing or invalid 'name' field")?,
             display_count
         );
-        let title = format!("{}{}", 
-            server["title"].as_str().ok_or("Missing or invalid 'title' field")?,
+        let title = format!(
+            "{}{}",
+            server["title"]
+                .as_str()
+                .ok_or("Missing or invalid 'title' field")?,
             display_count
         );
 
         info!("Formatted server name: {}", name);
-        info!("Formatted server title: {}", title);
+
+        // Modify population field based on 'available' in JSON
+        let population = if json_available == 0 {
+            "<b><font color=\"#FF0000\">Offline</font></b>".to_string()
+        } else {
+            server["population"]
+                .as_str()
+                .ok_or("Missing or invalid 'population' field")?
+                .to_string()
+        };
+
+        // Handle address and host fields
+        let address_str = server["address"].as_str();
+        let host_str = server["host"].as_str();
+
+        let (address, host) = match (address_str, host_str) {
+            (Some(addr), Some(_)) => {
+                // If both are present, use address and ignore host
+                (ipv4_to_u32(addr), Vec::new())
+            }
+            (Some(addr), None) => (ipv4_to_u32(addr), Vec::new()),
+            (None, Some(h)) => (0, utf16_to_bytes(h)),
+            (None, None) => return Err("Either 'address' or 'host' must be set".into()),
+        };
 
         let server_info = ServerInfo {
-            id: server["id"].as_u64().ok_or("Missing or invalid 'id' field")? as u32,
+            id: server_id,
             name: utf16_to_bytes(&name),
-            category: utf16_to_bytes(server["category"].as_str().ok_or("Missing or invalid 'category' field")?),
+            category: utf16_to_bytes(
+                server["category"]
+                    .as_str()
+                    .ok_or("Missing or invalid 'category' field")?,
+            ),
             title: utf16_to_bytes(&title),
-            queue: utf16_to_bytes(server["queue"].as_str().ok_or("Missing or invalid 'queue' field")?),
-            population: utf16_to_bytes(server["population"].as_str().ok_or("Missing or invalid 'population' field")?),
-            address: ipv4_to_u32(server["address"].as_str().ok_or("Missing or invalid 'address' field")?),
-            port: server["port"].as_u64().ok_or("Missing or invalid 'port' field")? as u32,
-            available: server["available"].as_u64().ok_or("Missing or invalid 'available' field")? as u32,
-            unavailable_message: utf16_to_bytes(server["unavailable_message"].as_str().unwrap_or("")),
-            host: utf16_to_bytes(server["host"].as_str().ok_or("Missing or invalid 'host' field")?),
+            queue: utf16_to_bytes(
+                server["queue"]
+                    .as_str()
+                    .ok_or("Missing or invalid 'queue' field")?,
+            ),
+            population: utf16_to_bytes(&population),
+            address,
+            port: server["port"]
+                .as_u64()
+                .ok_or("Missing or invalid 'port' field")? as u32,
+            available: 1,
+            unavailable_message: utf16_to_bytes(
+                server["unavailable_message"].as_str().unwrap_or(""),
+            ),
+            host,
         };
         server_list.servers.push(server_info);
     }
