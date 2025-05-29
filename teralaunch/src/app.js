@@ -3,6 +3,16 @@ const { listen } = window.__TAURI__.event;
 const { appWindow } = window.__TAURI__.window;
 const { message } = window.__TAURI__.dialog;
 
+import {
+  formatSize,
+  formatSpeed,
+  calculateGlobalTimeRemaining,
+  calculateAverageSpeed,
+  formatTime,
+  getFileName,
+} from "./utils.js";
+import { createUI } from "./ui.js";
+
 const REQUIRED_PRIVILEGE_LEVEL = 3;
 const UPDATE_CHECK_ENABLED = false;
 
@@ -15,19 +25,11 @@ const App = {
     RUS: "RUSSIAN",
     GER: "GERMAN",
   },
-  launchGameBtn: null,
-  statusEl: null,
-  loadingModal: null,
-  loadingMessage: null,
-  loadingError: null,
-  refreshButton: null,
-  quitTheApp: null,
   deferredUpdate: null,
+  ui: null, // UI module will be initialized here
 
   // Global application state
   state: {
-    lastLogMessage: null,
-    lastLogTime: 0,
     speedHistory: [],
     speedHistoryMaxLength: 10,
     isUpdateAvailable: false,
@@ -106,12 +108,15 @@ const App = {
    */
   async init() {
     try {
+      // Initialize UI module early, as other initializations might depend on it
+      // Passing 'this' (App) as the last argument for ui to call App methods if needed.
+      this.ui = createUI(this.state, this.t.bind(this), invoke, appWindow, message, this.Router, this);
+
       this.disableContextMenu();
       this.setupEventListeners();
       this.setupWindowControls();
       this.setupCustomAnimations();
-      this.initializeLoadingModalElements();
-      this.setupModalButtonEventHandlers();
+      // initializeLoadingModalElements() and setupModalButtonEventHandlers() are now called within ui.initElements()
       await this.updateLanguageSelector();
       this.Router.setupEventListeners();
       await this.Router.navigate();
@@ -199,18 +204,20 @@ const App = {
     listen("game_status", async (event) => {
       console.log("Game status update:", event.payload);
       const isRunning = event.payload === "GAME_STATUS_RUNNING";
-      this.updateUIForGameStatus(isRunning);
+      if (this.ui) this.ui.updateUIForGameStatus(isRunning);
     });
 
     listen("game_status_changed", (event) => {
       const isRunning = event.payload;
-      this.updateUIForGameStatus(isRunning);
+      if (this.ui) this.ui.updateUIForGameStatus(isRunning);
     });
 
     listen("game_ended", () => {
       console.log("Game has ended");
-      this.updateUIForGameStatus(false);
-      this.toggleModal("log-modal", false);
+      if (this.ui) {
+        this.ui.updateUIForGameStatus(false);
+        this.ui.toggleModal("log-modal", false);
+      }
     });
   },
 
@@ -254,60 +261,23 @@ const App = {
    */
   setupErrorListener() {
     listen("error", (event) => {
-      this.showErrorMessage(event.payload);
+      if (this.ui) this.ui.showErrorMessage(event.payload);
     });
   },
 
   // Function to handle the first launch
   async handleFirstLaunch() {
     console.log("First time launch detected");
-    this.showFirstLaunchModal();
+    if (this.ui) this.ui.showFirstLaunchModal(); // This method will be moved to ui.js
   },
 
-  // Function to show a custom modal for first launch
-  showFirstLaunchModal() {
-    const modal = document.createElement("div");
-    modal.id = "first-launch-modal";
-    modal.innerHTML = `
-            <div class="first-launch-modal-content">
-                <h2>${this.t("WELCOME_TO_LAUNCHER")}</h2>
-                <p>${this.t("FIRST_LAUNCH_MESSAGE")}</p>
-                <button id="set-game-path-btn">${this.t("SET_GAME_PATH")}</button>
-            </div>
-        `;
-    document.body.appendChild(modal);
+  // Function to show a custom modal for first launch - MOVED TO UI.JS
+  // showFirstLaunchModal() { ... }
 
-    const setGamePathBtn = document.getElementById("set-game-path-btn");
-    setGamePathBtn.addEventListener("click", () => {
-      this.closeFirstLaunchModal();
-      this.openGamePathSettings();
-    });
+  // Function to close the first launch modal - MOVED TO UI.JS
+  // closeFirstLaunchModal() { ... }
 
-    anime({
-      targets: modal,
-      opacity: [0, 1],
-      scale: [0.9, 1],
-      duration: 300,
-      easing: "easeOutQuad",
-    });
-  },
-
-  // Function to close the first launch modal
-  closeFirstLaunchModal() {
-    const modal = document.getElementById("first-launch-modal");
-    anime({
-      targets: modal,
-      opacity: 0,
-      scale: 0.9,
-      duration: 300,
-      easing: "easeInQuad",
-      complete: () => {
-        modal.remove();
-      },
-    });
-  },
-
-  // Function to open game path settings
+  // Function to open game path settings - REMAINS IN APP FOR NOW
   openGamePathSettings() {
     const settingsBtn = document.getElementById("openModal");
     if (settingsBtn) {
@@ -328,34 +298,8 @@ const App = {
     });
   },
 
-  // Function for custom notifications
-  showCustomNotification(message, type) {
-    const notification = document.createElement("div");
-    notification.className = `custom-notification ${type}`;
-    notification.textContent = message;
-    document.body.appendChild(notification);
-
-    anime({
-      targets: notification,
-      opacity: [0, 1],
-      translateY: [-20, 0],
-      duration: 300,
-      easing: "easeOutQuad",
-    });
-
-    setTimeout(() => {
-      anime({
-        targets: notification,
-        opacity: 0,
-        translateY: -20,
-        duration: 300,
-        easing: "easeInQuad",
-        complete: () => {
-          notification.remove();
-        },
-      });
-    }, 5000);
-  },
+  // Function for custom notifications - MOVED TO UI.JS
+  // showCustomNotification(message, type) { ... }
 
   /**
    * Handles download progress events from the backend.
@@ -398,10 +342,12 @@ const App = {
     const totalDownloadedBytes = downloaded_bytes;
 
     // Calculate global remaining time using totalDownloadedBytes
-    const timeRemaining = this.calculateGlobalTimeRemaining(
+    const timeRemaining = calculateGlobalTimeRemaining(
       totalDownloadedBytes,
       this.state.totalSize,
       speed,
+      this.state.speedHistory,
+      this.state.speedHistoryMaxLength,
     );
 
     console.log("Calculated download progress:", {
@@ -498,292 +444,18 @@ const App = {
    * possible after the state has changed, without causing unnecessary re-renders.
    * @return {void}
    */
-  updateUI() {
+  updateUI() { 
     if (!this.deferredUpdate) {
       this.deferredUpdate = requestAnimationFrame(() => {
-        this.updateUIElements();
+        if (this.ui) this.ui.updateUIElements(); // This method is now in ui.js
         this.deferredUpdate = null;
       });
     }
   },
 
-  /**
-   * Updates the UI elements with the latest state. This function is
-   * called when the state of the application changes.
-   *
-   * @return {void}
-   */
-  updateUIElements() {
-    const elements = {
-      statusString: document.getElementById("status-string"),
-      currentFile: document.getElementById("current-file"),
-      filesProgress: document.getElementById("files-progress"),
-      downloadedSize: document.getElementById("downloaded-size"),
-      totalSize: document.getElementById("total-size"),
-      progressPercentage: document.getElementById("progress-percentage"),
-      progressPercentageDiv: document.getElementById("progress-percentage-div"),
-      downloadSpeed: document.getElementById("download-speed"),
-      timeRemaining: document.getElementById("time-remaining"),
-      dlStatusString: document.getElementById("dl-status-string"),
-    };
-
-    if (!UPDATE_CHECK_ENABLED) {
-      if (elements.dlStatusString)
-        elements.dlStatusString.textContent = this.t("NO_UPDATE_REQUIRED");
-      if (elements.progressPercentage)
-        elements.progressPercentage.textContent = "(100%)";
-      if (elements.progressPercentageDiv)
-        elements.progressPercentageDiv.style.width = "100%";
-
-      // Hide unnecessary elements
-      if (elements.currentFile) elements.currentFile.style.display = "none";
-      if (elements.filesProgress) elements.filesProgress.style.display = "none";
-      if (elements.downloadedSize && elements.downloadedSize.parentElement)
-        elements.downloadedSize.parentElement.style.display = "none";
-      if (elements.totalSize && elements.totalSize.parentElement)
-        elements.totalSize.parentElement.style.display = "none";
-      if (elements.downloadSpeed) elements.downloadSpeed.style.display = "none";
-      if (elements.timeRemaining) elements.timeRemaining.style.display = "none";
-
-      return; // Exit the function because we don't need to update other elements
-    }
-
-    if (elements.timeRemaining) {
-      const timeText =
-        this.state.currentUpdateMode === "download"
-          ? this.formatTime(this.state.timeRemaining)
-          : "";
-      console.log("Formatted time:", timeText);
-      elements.timeRemaining.textContent = timeText || "Calculating...";
-    }
-
-    this.updateTextContents(elements);
-    this.updateProgressBar(elements);
-    this.updateDownloadInfo(elements);
-    this.updateElementsVisibility(elements);
-  },
-
-  /**
-   * Updates the text content of the elements in the object with the relevant text from the state.
-   * @param {Object} elements - An object containing the elements to be updated. Can contain the following properties:
-   *      dlStatusString: The element to display the download status string.
-   *      statusString: The element to display the status string.
-   *      currentFile: The element to display the current file name.
-   *      filesProgress: The element to display the progress of the file check (e.g. 10/100).
-   *      downloadedSize: The element to display the downloaded size.
-   *      totalSize: The element to display the total size.
-   */
-  updateTextContents(elements) {
-    if (elements.dlStatusString) {
-      elements.dlStatusString.textContent = this.getDlStatusString();
-    }
-    if (elements.statusString)
-      elements.statusString.textContent = this.getStatusText();
-    if (elements.currentFile)
-      elements.currentFile.textContent = this.getFileName(
-        this.state.currentFileName,
-      );
-    if (elements.filesProgress)
-      elements.filesProgress.textContent = `(${this.state.currentFileIndex}/${this.state.totalFiles})`;
-    if (elements.downloadedSize)
-      elements.downloadedSize.textContent = this.formatSize(
-        this.state.downloadedSize,
-      );
-    if (elements.totalSize)
-      elements.totalSize.textContent = this.formatSize(this.state.totalSize);
-  },
-
-  /**
-   * Updates the progress bar elements in the object with the relevant progress.
-   * @param {Object} elements - An object containing the elements to be updated. Can contain the following properties:
-   *      progressPercentage: The element to display the progress percentage.
-   *      progressPercentageDiv: The element to display the progress bar itself.
-   *      currentFile: The element to display the current file name.
-   */
-  updateProgressBar(elements) {
-    const progress = Math.min(100, this.calculateProgress());
-    if (elements.progressPercentage) {
-      if (this.state.currentUpdateMode === "ready") {
-        elements.progressPercentage.style.display = "none";
-        elements.currentFile.style.display = "none";
-      } else {
-        elements.progressPercentage.style.display = "inline";
-        elements.progressPercentage.textContent = `(${Math.round(progress)}%)`;
-        elements.currentFile.style.display = "flex !important";
-      }
-    }
-    if (elements.progressPercentageDiv) {
-      if (this.state.currentUpdateMode === "ready") {
-        elements.currentFile.style.display = "none";
-      } else {
-        elements.progressPercentageDiv.style.width = `${progress}%`;
-        elements.currentFile.style.display = "flex !important";
-      }
-    }
-  },
-
-  /**
-   * Updates the download info elements in the object with the relevant download information.
-   * @param {Object} elements - An object containing the elements to be updated. Can contain the following properties:
-   *      downloadSpeed: The element to display the download speed.
-   *      timeRemaining: The element to display the time remaining.
-   */
-  updateDownloadInfo(elements) {
-    console.log("Current update mode:", this.state.currentUpdateMode);
-    console.log("Current speed:", this.state.currentSpeed);
-    console.log("Time remaining:", this.state.timeRemaining);
-
-    if (elements.downloadSpeed) {
-      const speedText =
-        this.state.currentUpdateMode === "download"
-          ? this.formatSpeed(this.state.currentSpeed)
-          : "";
-      console.log("Formatted speed:", speedText);
-      elements.downloadSpeed.textContent = speedText;
-      console.log(
-        "Download speed element updated:",
-        elements.downloadSpeed.textContent,
-      );
-    } else {
-      console.log("Download speed element not found");
-    }
-    if (elements.timeRemaining) {
-      const timeText =
-        this.state.currentUpdateMode === "download"
-          ? this.formatTime(this.state.timeRemaining)
-          : "";
-      console.log("Formatted time:", timeText);
-      elements.timeRemaining.textContent = timeText;
-      console.log(
-        "Time remaining element updated:",
-        elements.timeRemaining.textContent,
-      );
-    } else {
-      console.log("Time remaining element not found");
-    }
-  },
-
-  /**
-   * Returns the current download status string based on the current update mode.
-   * This function will return the following strings based on the current update mode:
-   *      'file_check': 'VERIFYING_FILES'
-   *      'download': 'DOWNLOADING_FILES'
-   *      'complete': If the file check is complete and there is no update available, 'NO_UPDATE_REQUIRED'
-   *                  If the file check is complete and there is an update available, 'FILE_CHECK_COMPLETE'
-   *                  If the download is complete, 'DOWNLOAD_COMPLETE'
-   *                  If the update is complete, 'UPDATE_COMPLETED'
-   *      default: 'GAME_READY_TO_LAUNCH'
-   *
-   * @returns {string} The current download status string
-   */
-  getDlStatusString() {
-    if (!UPDATE_CHECK_ENABLED) {
-      return this.t("NO_UPDATE_REQUIRED");
-    }
-
-    switch (this.state.currentUpdateMode) {
-      case "file_check":
-        return this.t("VERIFYING_FILES");
-      case "download":
-        return this.t("DOWNLOADING_FILES");
-      case "complete":
-        if (this.state.isFileCheckComplete && !this.state.isUpdateAvailable) {
-          return this.t("NO_UPDATE_REQUIRED");
-        } else if (
-          this.state.isFileCheckComplete &&
-          this.state.isUpdateAvailable
-        ) {
-          return this.t("FILE_CHECK_COMPLETE");
-        } else if (this.state.isDownloadComplete) {
-          return this.t("DOWNLOAD_COMPLETE");
-        } else if (this.state.isUpdateComplete) {
-          return this.t("UPDATE_COMPLETED");
-        }
-        break;
-      default:
-        return this.t("GAME_READY_TO_LAUNCH");
-    }
-
-    return this.t("GAME_READY_TO_LAUNCH");
-  },
-
-  /**
-   * Calculates the current progress of the update as a percentage.
-   * If there is an update available and the total size of the update is greater than 0,
-   * the progress is calculated as (downloadedSize / totalSize) * 100.
-   * Otherwise, the current progress is returned.
-   * @returns {number} The current progress as a percentage
-   */
-  calculateProgress() {
-    if (this.state.isUpdateAvailable && this.state.totalSize > 0) {
-      return (this.state.downloadedSize / this.state.totalSize) * 100;
-    }
-    return this.state.currentProgress;
-  },
-
-  /**
-   * Returns the current download status string based on the current update mode.
-   * If the download is complete, 'DOWNLOAD_COMPLETE' is returned.
-   * If there is no update available, 'NO_UPDATE_REQUIRED' is returned.
-   * If the file check is being performed, 'VERIFYING_FILES' is returned.
-   * If the download is being performed, 'DOWNLOADING_FILES' is returned.
-   * @returns {string} The current download status string
-   */
-  getStatusText() {
-    if (this.state.isDownloadComplete) return this.t("DOWNLOAD_COMPLETE");
-    if (!this.state.isUpdateAvailable) return this.t("NO_UPDATE_REQUIRED");
-    return this.t(
-      this.state.currentUpdateMode === "file_check"
-        ? "VERIFYING_FILES"
-        : "DOWNLOADING_FILES",
-    );
-  },
-
-  /**
-   * Updates the visibility of the given elements based on the current state of the download.
-   * If the download is available and the current update mode is 'download',
-   * the elements are shown. Otherwise, they are hidden.
-   * @param {Object} elements - The elements to update.
-   */
-  updateElementsVisibility(elements) {
-    const showDownloadInfo =
-      this.state.isUpdateAvailable &&
-      this.state.currentUpdateMode === "download";
-
-    if (elements.currentFile)
-      elements.currentFile.style.display = this.state.isUpdateAvailable
-        ? "flex"
-        : "none";
-    if (elements.filesProgress)
-      elements.filesProgress.style.display = this.state.isUpdateAvailable
-        ? "inline"
-        : "none";
-    if (elements.downloadedSize && elements.downloadedSize.parentElement) {
-      elements.downloadedSize.parentElement.style.display = showDownloadInfo
-        ? "inline"
-        : "none";
-    }
-    if (elements.totalSize && elements.totalSize.parentElement) {
-      elements.totalSize.parentElement.style.display = showDownloadInfo
-        ? "inline"
-        : "none";
-    }
-    if (elements.progressPercentage) {
-      elements.progressPercentage.style.display =
-        this.state.isUpdateAvailable && this.state.currentUpdateMode !== "ready"
-          ? "inline"
-          : "none";
-    }
-    if (elements.downloadSpeed)
-      elements.downloadSpeed.style.display = showDownloadInfo
-        ? "inline"
-        : "none";
-    if (elements.timeRemaining)
-      elements.timeRemaining.style.display = showDownloadInfo
-        ? "inline"
-        : "none";
-  },
-
+  // updateUIElements, updateTextContents, updateProgressBar, updateDownloadInfo,
+  // getDlStatusString, calculateProgress, getStatusText, updateElementsVisibility
+  // are now defined in ui.js and will be removed from App.
   /**
    * Resets the state to its initial values.
    * This function is called on various events such as the download completing, the user logging out, or the user navigating away from the page.
@@ -833,8 +505,8 @@ const App = {
         currentUpdateMode: "ready",
       });
       // Re-enable the game launch button and language selector
-      this.updateLaunchGameButton(false);
-      this.toggleLanguageSelector(true);
+      if (this.ui) this.ui.updateLaunchGameButton(false); // This method will be moved to ui.js
+      if (this.ui) this.ui.toggleLanguageSelector(true); // This method will be moved to ui.js
     }, 2000);
   },
 
@@ -921,8 +593,8 @@ const App = {
       currentUpdateMode: "file_check",
     });
     // Disable the game launch button and language selector during the check
-    this.updateLaunchGameButton(true);
-    this.toggleLanguageSelector(false);
+    if (this.ui) this.ui.updateLaunchGameButton(true);
+    if (this.ui) this.ui.toggleLanguageSelector(false);
 
     try {
       this.resetState();
@@ -936,8 +608,8 @@ const App = {
           currentUpdateMode: "complete",
         });
         // Re-enable elements if no update is needed
-        this.updateLaunchGameButton(false);
-        this.toggleLanguageSelector(true);
+        if (this.ui) this.ui.updateLaunchGameButton(false);
+        if (this.ui) this.ui.toggleLanguageSelector(true);
         setTimeout(() => {
           this.setState({ currentUpdateMode: "ready" });
         }, 1000);
@@ -960,10 +632,10 @@ const App = {
     } catch (error) {
       console.error("Error checking for updates:", error);
       this.resetState();
-      this.showErrorMessage(this.t("UPDATE_SERVER_UNREACHABLE"));
+      if (this.ui) this.ui.showErrorMessage(this.t("UPDATE_SERVER_UNREACHABLE"));
       // Re-enable elements in case of error
-      this.updateLaunchGameButton(false);
-      this.toggleLanguageSelector(true);
+      if (this.ui) this.ui.updateLaunchGameButton(false);
+      if (this.ui) this.ui.toggleLanguageSelector(true);
     } finally {
       this.setState({ isCheckingForUpdates: false });
     }
@@ -988,14 +660,14 @@ const App = {
     }
     try {
       // Disable the game launch button and language selector at the start of the process
-      this.updateLaunchGameButton(true);
-      this.toggleLanguageSelector(false);
+      if (this.ui) this.ui.updateLaunchGameButton(true);
+      if (this.ui) this.ui.toggleLanguageSelector(false);
 
       if (filesToUpdate.length === 0) {
         console.log("No update needed");
         // Re-enable elements if no update is needed
-        this.updateLaunchGameButton(false);
-        this.toggleLanguageSelector(true);
+        if (this.ui) this.ui.updateLaunchGameButton(false);
+        if (this.ui) this.ui.toggleLanguageSelector(true);
         return;
       }
 
@@ -1042,11 +714,11 @@ const App = {
       this.handleCompletion();
     } catch (error) {
       console.error("Error during update:", error);
-      this.showErrorMessage(this.t("UPDATE_ERROR_MESSAGE"));
+      if (this.ui) this.ui.showErrorMessage(this.t("UPDATE_ERROR_MESSAGE"));
     } finally {
       // Re-enable the game launch button and language selector at the end of the process
-      this.updateLaunchGameButton(false);
-      this.toggleLanguageSelector(true);
+      if (this.ui) this.ui.updateLaunchGameButton(false);
+      if (this.ui) this.ui.toggleLanguageSelector(true);
     }
   },
 
@@ -1279,51 +951,8 @@ const App = {
     this.updateUI();
   },
 
-  /**
-   * Updates the dynamic UI elements (i.e., the game status and the launch
-   * game button) with the current translations.
-   *
-   * @returns {void}
-   */
-  updateDynamicTranslations() {
-    if (this.statusEl) {
-      this.statusEl.textContent = this.t(
-        this.state.isGameRunning
-          ? "GAME_STATUS_RUNNING"
-          : "GAME_STATUS_NOT_RUNNING",
-      );
-    }
-    if (this.launchGameBtn) {
-      this.launchGameBtn.textContent = this.t("LAUNCH_GAME");
-    }
-  },
-
-  /**
-   * Enables or disables the language selector UI element, depending on the
-   * value of the `enable` parameter. If `enable` is true, the language selector
-   * will be enabled and the user will be able to select a language. If `enable`
-   * is false, the language selector will be disabled and the user will not be
-   * able to select a language.
-   *
-   * @param {boolean} enable If true, the language selector will be enabled.
-   *                          If false, the language selector will be disabled.
-   * @returns {void}
-   */
-  toggleLanguageSelector(enable) {
-    const selectWrapper = document.querySelector(".select-wrapper");
-    const selectStyled = selectWrapper?.querySelector(".select-styled");
-
-    if (selectWrapper && selectStyled) {
-      if (enable) {
-        selectWrapper.classList.remove("disabled");
-        selectStyled.style.pointerEvents = "auto";
-      } else {
-        selectWrapper.classList.add("disabled");
-        selectStyled.style.pointerEvents = "none";
-      }
-    }
-  },
-
+  // updateDynamicTranslations is now in ui.js
+  // toggleLanguageSelector is now in ui.js
   /**
    * Handles the game launch process. If updates are available, it prevents
    * the game from launching until the updates are applied. If the game is
@@ -1351,16 +980,16 @@ const App = {
     this.setState({ isGameLaunching: true });
 
     try {
-      this.updateUIForGameStatus(true);
-      if (this.statusEl) this.statusEl.textContent = this.t("LAUNCHING_GAME");
+      if (this.ui) this.ui.updateUIForGameStatus(true);
+      if (this.ui && this.ui.statusEl) this.ui.statusEl.textContent = this.t("LAUNCHING_GAME");
 
-      await this.subscribeToLogs();
+      await this.subscribeToLogs(); // subscribeToLogs uses ui.appendLogMessage
 
       console.log("Creating log modal");
-      this.createLogModal();
+      if (this.ui) this.ui.createLogModal();
 
       console.log("Attempting to show log modal");
-      this.toggleModal("log-modal", true);
+      if (this.ui) this.ui.toggleModal("log-modal", true);
 
       // Check if the modal is visible
       const logModal = document.getElementById("log-modal");
@@ -1380,13 +1009,13 @@ const App = {
         title: this.t("ERROR"),
         type: "error",
       });
-      if (this.statusEl)
-        this.statusEl.textContent = this.t(
+      if (this.ui && this.ui.statusEl)
+        this.ui.statusEl.textContent = this.t(
           "GAME_LAUNCH_ERROR",
           error.toString(),
         );
       await invoke("reset_launch_state");
-      this.updateUIForGameStatus(false);
+      if (this.ui) this.ui.updateUIForGameStatus(false);
       this.setState({ gameExecutionFailed: true });
     } finally {
       this.setState({ isGameLaunching: false });
@@ -1405,90 +1034,17 @@ const App = {
   async updateGameStatus() {
     try {
       const isRunning = await invoke("get_game_status");
-      this.updateUIForGameStatus(isRunning);
+      if (this.ui) this.ui.updateUIForGameStatus(isRunning); // Call to ui method
     } catch (error) {
       console.error("Error checking game status:", error);
-      if (this.statusEl)
-        this.statusEl.textContent = this.t("GAME_STATUS_ERROR");
+      if (this.ui && this.ui.statusEl) // Check ui and element exists
+        this.ui.statusEl.textContent = this.t("GAME_STATUS_ERROR");
     }
   },
 
-  /**
-   * Updates the game status UI based on the current game status.
-   *
-   * The game status element is updated to either "GAME_STATUS_RUNNING" or "GAME_STATUS_NOT_RUNNING".
-   * The launch game button is also updated to be enabled or disabled based on the game status.
-   * The language selector is toggled to be visible or hidden based on the game status.
-   *
-   * @param {boolean} isRunning - whether the game is running or not
-   * @memberof App
-   */
-  updateUIForGameStatus(isRunning) {
-    if (this.statusEl) {
-      this.statusEl.textContent = isRunning
-        ? this.t("GAME_STATUS_RUNNING")
-        : this.t("GAME_STATUS_NOT_RUNNING");
-    }
-    this.updateLaunchGameButton(isRunning);
-    this.toggleLanguageSelector(!isRunning);
-  },
-
-  /**
-   * Updates the launch game button UI based on the current game status.
-   *
-   * The launch game button is disabled or enabled based on the game status.
-   * The "disabled" class is also toggled on the button based on the game status.
-   *
-   * @param {boolean} disabled - whether the game is running or not
-   * @memberof App
-   */
-  updateLaunchGameButton(disabled) {
-    if (this.launchGameBtn) {
-      this.launchGameBtn.disabled = disabled;
-      this.launchGameBtn.classList.toggle("disabled", disabled);
-    }
-  },
-
-  /**
-   * Updates the hash file generation progress UI based on the current game status.
-   *
-   * The hash file generation progress bar, current file being processed, and progress text are updated
-   * based on the current game status. The modal title is also updated if necessary.
-   *
-   * @memberof App
-   */
-  updateHashFileProgressUI() {
-    const modal = document.getElementById("hash-file-progress-modal");
-    if (!modal || modal.style.display === "none") {
-      return; // Ne pas mettre à jour si le modal n'est pas visible
-    }
-
-    const progressBar = modal.querySelector(".hash-progress-bar");
-    const currentFileEl = modal.querySelector("#hash-file-current-file");
-    const progressTextEl = modal.querySelector("#hash-file-progress-text");
-
-    if (progressBar) {
-      progressBar.style.width = `${this.state.hashFileProgress}%`;
-      progressBar.textContent = `${Math.round(this.state.hashFileProgress)}%`;
-    }
-
-    if (currentFileEl) {
-      const processingFileText = this.t("PROCESSING_FILE");
-      currentFileEl.textContent = `${processingFileText}: ${this.state.currentProcessingFile}`;
-    }
-
-    if (progressTextEl) {
-      const progressText = this.t("PROGRESS_TEXT");
-      progressTextEl.textContent = `${progressText} ${this.state.processedFiles}/${this.state.totalFiles} (${this.state.hashFileProgress.toFixed(2)}%)`;
-    }
-
-    // Mettre à jour le titre du modal si nécessaire
-    const modalTitle = modal.querySelector("h2");
-    if (modalTitle) {
-      modalTitle.textContent = this.t("GENERATING_HASH_FILE");
-    }
-  },
-
+  // updateUIForGameStatus (App object's own version) is now removed (moved to ui.js)
+  // updateLaunchGameButton (App object's own version) is now removed (moved to ui.js)
+  // updateHashFileProgressUI is now in ui.js
   /**
    * Checks if the game is currently running.
    *
@@ -1513,10 +1069,10 @@ const App = {
    */
   async checkServerConnection() {
     console.log("Checking server connection");
-    this.showLoadingModal(this.t("CHECKING_SERVER_CONNECTION"));
+    if (this.ui) this.ui.showLoadingModal(this.t("CHECKING_SERVER_CONNECTION"));
     try {
       const isConnected = await invoke("check_server_connection");
-      this.hideLoadingModal();
+      if (this.ui) this.ui.hideLoadingModal();
       if (isConnected) {
         console.log("Server connection successful");
       } else {
@@ -1525,365 +1081,18 @@ const App = {
       return isConnected;
     } catch (error) {
       console.error("Server connection error:", error);
-      this.showLoadingError(this.t("SERVER_CONNECTION_ERROR"));
+      if (this.ui) this.ui.showLoadingError(this.t("SERVER_CONNECTION_ERROR"));
       return false;
     } finally {
       console.log("Server connection check complete");
     }
   },
 
-  /**
-   * Formats a given number of bytes into a human-readable size string.
-   *
-   * @param {number} bytes the number of bytes to format
-   * @returns {string} the formatted size string
-   * @memberof App
-   */
-  formatSize(bytes) {
-    if (bytes === undefined || bytes === null || isNaN(bytes)) return "0 B";
-    const units = ["B", "KB", "MB", "GB", "TB"];
-    let size = parseFloat(bytes);
-    let unitIndex = 0;
-    while (size >= 1024 && unitIndex < units.length - 1) {
-      size /= 1024;
-      unitIndex++;
-    }
-    return `${size.toFixed(2)} ${units[unitIndex]}`;
-  },
-
-  /**
-   * Formats a given number of bytes per second into a human-readable speed string.
-   *
-   * @param {number} bytesPerSecond the number of bytes per second to format
-   * @returns {string} the formatted speed string
-   * @memberof App
-   */
-  formatSpeed(bytesPerSecond) {
-    if (!isFinite(bytesPerSecond) || bytesPerSecond < 0) return "0 B/s";
-    const units = ["B/s", "KB/s", "MB/s", "GB/s"];
-    let speed = bytesPerSecond;
-    let unitIndex = 0;
-    while (speed >= 1024 && unitIndex < units.length - 1) {
-      speed /= 1024;
-      unitIndex++;
-    }
-    return `${speed.toFixed(2)} ${units[unitIndex]}`;
-  },
-
-  /**
-   * Calculates the estimated time remaining for a download based on the total number of bytes downloaded so far, the total size of the download, and the current download speed.
-   *
-   * @param {number} totalDownloadedBytes the total number of bytes already downloaded
-   * @param {number} totalSize the total size of the download in bytes
-   * @param {number} speed the current download speed in bytes per second
-   * @returns {number} the estimated time remaining in seconds, or 0 if the input is invalid. The result is capped at 30 days maximum.
-   * @memberof App
-   */
-  calculateGlobalTimeRemaining(totalDownloadedBytes, totalSize, speed) {
-    console.log("Calculating global time remaining:", {
-      totalDownloadedBytes,
-      totalSize,
-      speed,
-    });
-    if (
-      !isFinite(speed) ||
-      speed <= 0 ||
-      !isFinite(totalDownloadedBytes) ||
-      !isFinite(totalSize) ||
-      totalDownloadedBytes >= totalSize
-    ) {
-      console.log("Invalid input for global time remaining calculation");
-      return 0;
-    }
-    let bytesRemaining = totalSize - totalDownloadedBytes;
-
-    let averageSpeed = this.calculateAverageSpeed(speed);
-
-    let secondsRemaining = bytesRemaining / averageSpeed;
-    console.log("Calculated time remaining:", secondsRemaining);
-    return Math.min(secondsRemaining, 30 * 24 * 60 * 60); // Limit to 30 days maximum
-  },
-
-  // Updated calculateAverageSpeed method
-  calculateAverageSpeed(currentSpeed) {
-    // Add current speed to history
-    this.state.speedHistory.push(currentSpeed);
-
-    // Limit history size
-    if (this.state.speedHistory.length > this.state.speedHistoryMaxLength) {
-      this.state.speedHistory.shift(); // Remove oldest value
-    }
-
-    // Calculate average speed
-    const sum = this.state.speedHistory.reduce((acc, speed) => acc + speed, 0);
-    const averageSpeed = sum / this.state.speedHistory.length;
-
-    console.log("Speed history:", this.state.speedHistory);
-    console.log("Average speed:", averageSpeed);
-
-    return averageSpeed;
-  },
-
-  /**
-   * Format a time in seconds to a human-readable string.
-   * If the input is invalid, returns 'Calculating...'
-   * @param {number} seconds the time in seconds
-   * @returns {string} a human-readable string representation of the time
-   * @memberof App
-   */
-  formatTime(seconds) {
-    if (!isFinite(seconds) || seconds < 0) return "Calculating...";
-
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const remainingSeconds = Math.floor(seconds % 60);
-
-    if (hours > 0) {
-      return `${hours}h ${minutes}m ${remainingSeconds}s`;
-    } else if (minutes > 0) {
-      return `${minutes}m ${remainingSeconds}s`;
-    } else {
-      return `${remainingSeconds}s`;
-    }
-  },
-
-  /**
-   * Returns the file name from a given path, or an empty string if the path is invalid.
-   * @param {string} path the path to get the file name from
-   * @returns {string} the file name
-   * @memberof App
-   */
-  getFileName(path) {
-    return path ? path.split("\\").pop().split("/").pop() : "";
-  },
-
-  /**
-   * Shows an error message in the #error-container element for 5 seconds.
-   * If the element does not exist, does nothing.
-   * @param {string} message the error message to display
-   * @memberof App
-   */
-  showErrorMessage(message) {
-    const errorContainer = document.getElementById("error-container");
-    if (errorContainer) {
-      errorContainer.textContent = message;
-      errorContainer.style.display = "block";
-      setTimeout(() => {
-        errorContainer.style.display = "none";
-      }, 5000);
-    }
-  },
-
-  // Updated methods for loading modal
-  showLoadingModal(message) {
-    this.toggleModal("loading-modal", true, message);
-
-    // Specific handling for loading modal elements
-    if (this.loadingError) {
-      this.loadingError.textContent = "";
-      this.loadingError.style.display = "none";
-    }
-    if (this.refreshButton) {
-      this.refreshButton.style.display = "none";
-    }
-    if (this.quitTheApp) {
-      this.quitTheApp.style.display = "none";
-    }
-  },
-
-  /**
-   * Hides the loading modal.
-   * @memberof App
-   */
-  hideLoadingModal() {
-    this.toggleModal("loading-modal", false);
-  },
-
-  /**
-   * Toggles the display of a modal.
-   * @param {string} modalId The id of the modal to toggle.
-   * @param {boolean} show Whether to show or hide the modal.
-   * @param {string} [message] An optional message to display in the modal.
-   * @memberof App
-   */
-  toggleModal(modalId, show, message = "") {
-    const modal = document.getElementById(modalId);
-    if (!modal) {
-      console.error(`Modal with id ${modalId} not found`);
-      return;
-    }
-
-    console.log(`Toggling modal ${modalId}, show: ${show}`);
-
-    modal.classList.toggle("show", show);
-    modal.style.display = show ? "block" : "none";
-
-    // Handle message for loading modal
-    if (modalId === "loading-modal" && message) {
-      const messageElement = modal.querySelector(".loading-message");
-      if (messageElement) {
-        messageElement.textContent = message;
-      }
-    }
-
-    console.log(
-      `Modal ${modalId} visibility:`,
-      modal.classList.contains("show"),
-    );
-  },
-
-  /**
-   * Toggles the display of the hash file progress modal.
-   * @param {boolean} show Whether to show or hide the modal.
-   * @param {string} [message] An optional message to display in the modal.
-   * @param {boolean} [isComplete=false] Whether the hash file generation is complete.
-   * If true, shows a success message and closes the modal after 5 seconds.
-   * @memberof App
-   */
-  toggleHashProgressModal(show, message = "", isComplete = false) {
-    const modal = document.getElementById("hash-file-progress-modal");
-    if (!modal) {
-      console.error("Hash file progress modal not found");
-      return;
-    }
-
-    console.log(`Toggling hash progress modal, show: ${show}`);
-
-    if (show) {
-      modal.classList.add("show", "hash-modal-fade-in");
-      modal.style.display = "block";
-
-      // Handle message for hash file progress modal
-      const messageElement = modal.querySelector("#hash-file-progress-text");
-      if (messageElement && message) {
-        messageElement.textContent = message;
-      }
-
-      if (isComplete) {
-        // Show success message
-        const successMessage = this.t("HASH_FILE_GENERATION_COMPLETE");
-        const successElement = document.createElement("div");
-        successElement.id = "hash-success-message";
-        successElement.textContent = successMessage;
-
-        const modalContent =
-          modal.querySelector(".hash-progress-modal") || modal;
-        modalContent.appendChild(successElement);
-
-        // Wait 5 seconds, then close the modal
-        setTimeout(() => {
-          this.toggleHashProgressModal(false);
-        }, 5000);
-      }
-    } else {
-      modal.classList.remove("show", "hash-modal-fade-in");
-
-      // Use a fade-out animation
-      anime({
-        targets: modal,
-        opacity: 0,
-        duration: 500,
-        easing: "easeOutQuad",
-        complete: () => {
-          modal.style.display = "none";
-          modal.style.opacity = 1; // Reset opacity for next time
-
-          // Remove success message if it exists
-          const successElement = modal.querySelector("#hash-success-message");
-          if (successElement) {
-            successElement.remove();
-          }
-        },
-      });
-    }
-
-    console.log(
-      `Hash progress modal visibility:`,
-      modal.classList.contains("show"),
-    );
-  },
-
-  //method to display the loading indicator
-  showLoadingIndicator() {
-    let loadingIndicator = document.getElementById("loading-indicator");
-    if (!loadingIndicator) {
-      loadingIndicator = document.createElement("div");
-      loadingIndicator.id = "loading-indicator";
-      loadingIndicator.innerHTML = '<div class="spinner"></div>';
-      document.body.appendChild(loadingIndicator);
-    }
-    loadingIndicator.style.display = "flex";
-  },
-
-  //method to hide the loading indicator
-  hideLoadingIndicator() {
-    const loadingIndicator = document.getElementById("loading-indicator");
-    if (loadingIndicator) {
-      loadingIndicator.style.display = "none";
-    }
-  },
-
-  /**
-   * Shows the loading error message on the loading modal.
-   * @param {string} errorMessage The error message to be displayed.
-   */
-  showLoadingError(errorMessage) {
-    const loadingModal = document.getElementById("loading-modal");
-    if (loadingModal) {
-      const errorElement = loadingModal.querySelector(".loading-error");
-      if (errorElement) {
-        errorElement.textContent = errorMessage;
-        errorElement.style.display = "block";
-      }
-
-      const refreshButton = loadingModal.querySelector("#refresh-button");
-      if (refreshButton) {
-        refreshButton.style.display = "inline-block";
-      }
-
-      const quitButton = loadingModal.querySelector("#quit-button");
-      if (quitButton) {
-        quitButton.style.display = "inline-block";
-      }
-    }
-  },
-
-  /**
-   * Shows a notification at the top of the page.
-   * @param {string} message The message to be displayed in the notification.
-   * @param {string} type The type of the notification, which will be used to determine the
-   * colour of the notification. Possible values are 'success' and 'error'.
-   */
-  showNotification(message, type) {
-    const notification = document.getElementById("notification");
-    if (notification) {
-      notification.textContent = message;
-      notification.className = `notification ${type}`;
-
-      // Show the notification
-      gsap.fromTo(
-        notification,
-        { opacity: 0, y: -20 },
-        {
-          duration: 0.5,
-          opacity: 1,
-          y: 0,
-          display: "block",
-          ease: "power2.out",
-        },
-      );
-
-      // Hide the notification after 5 seconds
-      gsap.to(notification, {
-        delay: 5,
-        duration: 0.5,
-        opacity: 0,
-        y: -20,
-        display: "none",
-        ease: "power2.in",
-      });
-    }
-  },
+  // Definitions of showErrorMessage, showLoadingModal, hideLoadingModal, toggleModal, 
+  // toggleHashProgressModal, showLoadingIndicator, hideLoadingIndicator, showLoadingError, 
+  // showNotification, createLogModal, appendLogMessage, closeModal, 
+  // initializeLoadingModalElements, setupModalButtonEventHandlers, and showCustomNotification (definition)
+  // are removed as they are now in ui.js. Calls were updated in previous steps.
 
   /**
    * Loads the translations from a JSON file named `translations.json` at the root of the
@@ -2349,126 +1558,8 @@ const App = {
    * @memberof App
    * @returns {void}
    */
-  initializeLoadingModalElements() {
-    this.loadingModal = document.getElementById("loading-modal");
-    if (this.loadingModal) {
-      this.loadingMessage = this.loadingModal.querySelector(".loading-message");
-      this.loadingError = this.loadingModal.querySelector(".loading-error");
-      this.refreshButton = this.loadingModal.querySelector("#refresh-button");
-      this.quitTheApp = this.loadingModal.querySelector("#quit-button");
-    } else {
-      console.error("Loading modal elements not found in the DOM");
-    }
-  },
-
-  /**
-   * Sets up event listeners for the refresh and quit buttons in the loading modal.
-   *
-   * If the refresh button is found, adds a click event listener that checks if the user
-   * is connected to the internet and authenticated. If both conditions are true, calls
-   * initializeAndCheckUpdates. If the quit button is found, adds a click event listener
-   * that calls appQuit.
-   * @memberof App
-   * @returns {void}
-   */
-  setupModalButtonEventHandlers() {
-    if (this.refreshButton) {
-      this.refreshButton.addEventListener("click", async () => {
-        const isConnected = await this.checkServerConnection();
-        if (isConnected && this.state.isAuthenticated) {
-          await this.initializeAndCheckUpdates();
-        }
-      });
-    }
-    if (this.quitTheApp) {
-      this.quitTheApp.addEventListener("click", () => this.appQuit());
-    }
-  },
-
-  /**
-   * Creates the log modal if it doesn't exist and appends it to the body.
-   * Otherwise, checks if the log modal exists and does nothing.
-   * @memberof App
-   * @returns {void}
-   */
-  createLogModal() {
-    let modal = document.getElementById("log-modal");
-    if (!modal) {
-      modal = document.createElement("div");
-      modal.id = "log-modal";
-      modal.innerHTML = `
-                <div class="log-modal-content">
-                    <div class="log-modal-header">
-                        <h2>${this.t("GAME_LOGS")}</h2>
-                        <span class="log-modal-close">&times;</span>
-                    </div>
-                    <div id="log-console"></div>
-                </div>
-            `;
-      document.body.appendChild(modal);
-
-      const closeBtn = modal.querySelector(".log-modal-close");
-      closeBtn.onclick = () => this.toggleModal("log-modal", false);
-    }
-    console.log("Log modal created/checked");
-  },
-
-  /**
-   * Appends a message to the log console.
-   * @param {string} message The message to append. May contain a log level prefix.
-   * @returns {void}
-   */
-  appendLogMessage(message) {
-    const console = document.getElementById("log-console");
-    const currentTime = Date.now();
-
-    // Check if this exact message was logged in the last 100ms
-    if (
-      message === this.lastLogMessage &&
-      currentTime - this.lastLogTime < 100
-    ) {
-      return; // Skip duplicate message
-    }
-
-    // Update last message and time
-    this.lastLogMessage = message;
-    this.lastLogTime = currentTime;
-
-    if (console) {
-      const logEntry = document.createElement("div");
-      logEntry.className = "log-entry";
-      const time = new Date().toLocaleTimeString();
-
-      let logLevel = "info"; // Default log level
-      let messageContent = message;
-      const logLevels = ["INFO", "DEBUG", "WARN", "ERROR", "CRITICAL"];
-
-      // Remove any leading log level from the message
-      for (const level of logLevels) {
-        if (messageContent.startsWith(level + ": ")) {
-          messageContent = messageContent.substring(level.length + 2);
-          break;
-        }
-      }
-
-      // Detect log level
-      for (const level of logLevels) {
-        if (messageContent.startsWith(level + " -")) {
-          logLevel = level.toLowerCase();
-          messageContent = messageContent.substring(level.length + 2).trim();
-          break;
-        }
-      }
-
-      logEntry.innerHTML = `
-                <span class="log-entry-time">[${time}]</span>
-                <span class="log-entry-level ${logLevel}">${logLevel.toUpperCase()}:</span>
-                <span class="log-entry-message">${messageContent}</span>
-            `;
-      console.appendChild(logEntry);
-      console.scrollTop = console.scrollHeight;
-    }
-  },
+  // initializeLoadingModalElements, setupModalButtonEventHandlers, createLogModal, appendLogMessage
+  // are now part of ui.js
 
   /**
    * Subscribes to the "log_message" event and appends new log messages to the log console.
@@ -2496,16 +1587,16 @@ const App = {
       console.log("Game path saved successfully");
       if (this.state.isFirstLaunch) {
         this.completeFirstLaunch();
-        this.showCustomNotification(
+        if (this.ui) this.ui.showCustomNotification(
           this.t("GAME_PATH_SET_FIRST_LAUNCH"),
           "success",
         );
       } else {
-        this.showCustomNotification(this.t("GAME_PATH_UPDATED"), "success");
+        if (this.ui) this.ui.showCustomNotification(this.t("GAME_PATH_UPDATED"), "success");
       }
     } catch (error) {
       console.error("Error saving game path:", error);
-      this.showCustomNotification(this.t("GAME_PATH_SAVE_ERROR"), "error");
+      if (this.ui) this.ui.showCustomNotification(this.t("GAME_PATH_SAVE_ERROR"), "error");
       throw error;
     }
   },
@@ -2685,15 +1776,7 @@ const App = {
    * privilege level. If the user has the required privilege level, the button is
    * displayed; otherwise, it is hidden.
    */
-  updateUIBasedOnPrivileges() {
-    const generateHashFileBtn = document.getElementById("generate-hash-file");
-    if (generateHashFileBtn) {
-      generateHashFileBtn.style.display = this.checkPrivilegeLevel()
-        ? "block"
-        : "none";
-    }
-  },
-
+  // updateUIBasedOnPrivileges is moved to ui.js
   /**
    * Checks if the user is authenticated by checking for the presence of a stored
    * authentication key in local storage. If the key is present, the user is
@@ -2766,7 +1849,7 @@ const App = {
         generateHashBtn.disabled = true;
       }
 
-      this.toggleHashProgressModal(
+      if (this.ui) this.ui.toggleHashProgressModal(
         true,
         this.t("INITIALIZING_HASH_GENERATION"),
       );
@@ -2792,11 +1875,11 @@ const App = {
 
       const result = await invoke("generate_hash_file");
       console.log("Hash file generation result:", result);
-      this.toggleHashProgressModal(true, "", true);
-      this.showNotification(this.t("HASH_FILE_GENERATED"), "success");
+      if (this.ui) this.ui.toggleHashProgressModal(true, "", true);
+      if (this.ui) this.ui.showNotification(this.t("HASH_FILE_GENERATED"), "success");
     } catch (error) {
       console.error("Error generating hash file:", error);
-      this.showNotification(this.t("HASH_FILE_GENERATION_ERROR"), "error");
+      if (this.ui) this.ui.showNotification(this.t("HASH_FILE_GENERATION_ERROR"), "error");
     } finally {
       this.setState({
         isGeneratingHashFile: false,
